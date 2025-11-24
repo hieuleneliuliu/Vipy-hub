@@ -6,22 +6,22 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local CommF_ = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/UI-Library/Rayfield/main/source.lua'))()
 
-getgenv().Config = {
+getgenv().Settings = {
     AutoFarm = false,
     AutoBoss = false,
     AutoMastery = false,
-    AutoFruits = false,
-    AutoStats = "Melee",
+    AutoFruit = false,
+    SelectedStat = "Melee",
     FlySpeed = 200
 }
-getgenv().FlyEnabled = false
+getgenv().Fly = false
 getgenv().NoClip = false
 
 local Window = Rayfield:CreateWindow({
@@ -32,86 +32,82 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
-Rayfield:Notify({
-    Title = "Vipy Hub Loaded!",
-    Content = "Chào mừng bạn đến với Vipy Hub ❤️",
-    Duration = 6,
-    Image = AvatarURL
-})
+Rayfield:Notify({Title="Vipy Hub",Content="Loaded thành công ❤️",Duration=6,Image=AvatarURL})
 
-local HomeTab = Window:CreateTab("Trang Chủ", 4483362458)
-local HomeSec = HomeTab:CreateSection("Thông Tin")
-HomeSec:CreateLabel(" ")
-HomeSec:CreateImage({Image = AvatarURL, Size = UDim2.new(0,200,0,200)})
-HomeSec:CreateLabel("Vipy Hub Blox Fruits 2025")
-HomeSec:CreateLabel("Owner: "..OwnerName)
-HomeSec:CreateLabel("Full tính năng - No Key")
-HomeSec:CreateLabel("Chơi acc phụ để an toàn!")
+local Home = Window:CreateTab("Trang Chủ", 4483362458)
+Home:CreateSection("Info"):CreateLabel(" ")
+Home:CreateSection("Info"):CreateImage({Image=AvatarURL,Size=UDim2.new(0,200,0,200)})
+Home:CreateSection("Info"):CreateLabel("Vipy Hub Blox Fruits 2025")
+Home:CreateSection("Info"):CreateLabel("Owner: "..OwnerName)
 
-local MainTab = Window:CreateTab("Blox Fruits", 4483362458)
+local Main = Window:CreateTab("Blox Fruits", 4483362458)
 
-local FarmSec = MainTab:CreateSection("Tự Động Farm")
-MainTab:CreateToggle({Name="Auto Farm Level/Quest",CurrentValue=false,Callback=function(v) getgenv().Config.AutoFarm=v end})
-MainTab:CreateToggle({Name="Auto Farm Boss",CurrentValue=false,Callback=function(v) getgenv().Config.AutoBoss=v end})
-MainTab:CreateToggle({Name="Auto Mastery",CurrentValue=false,Callback=function(v) getgenv().Config.AutoMastery=v end})
-MainTab:CreateToggle({Name="Auto Collect Fruits",CurrentValue=false,Callback=function(v) getgenv().Config.AutoFruits=v end})
+-- Auto Farm Level (thật, hoạt động Sea 1-3)
+Main:CreateSection("Farm"):CreateToggle({Name="Auto Farm Level",CurrentValue=false,Callback=function(v)
+    getgenv().Settings.AutoFarm = v
+    spawn(function()
+        while getgenv().Settings.AutoFarm and task.wait(0.5) do
+            pcall(function()
+                local quest = player.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text
+                if string.find(quest, "Defeat") then
+                    local enemyName = quest:match("Defeat (.+)")
+                    for _, mob in pairs(Workspace.Enemies:GetChildren()) do
+                        if mob.Name:find(enemyName) and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
+                            repeat task.wait()
+                                player.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0,15,0)
+                                VirtualUser:ClickButton1(Vector2.new(500,500))
+                            until not getgenv().Settings.AutoFarm or mob.Humanoid.Health <= 0
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end})
 
-local StatsSec = MainTab:CreateSection("Auto Stats")
-MainTab:CreateDropdown({Name="Chọn Stats",Options={"Melee","Defense","Sword","Gun","Fruit"},CurrentOption="Melee",Callback=function(o) getgenv().Config.AutoStats=o end})
-MainTab:CreateToggle({Name="Bật Auto Stats",CurrentValue=false,Callback=function(v)
+-- Auto Stats (chậm + random, anti-detect)
+Main:CreateSection("Stats"):CreateDropdown({Name="Stat",Options={"Melee","Defense","Sword","Gun","Fruit"},CurrentOption="Melee",Callback=function(v) getgenv().Settings.SelectedStat=v end})
+Main:CreateSection("Stats"):CreateToggle({Name="Auto Stats",CurrentValue=false,Callback=function(v)
+    spawn(function()
+        while v do task.wait(math.random(3,7))
+            pcall(function() CommF_:InvokeServer("AddPoint", getgenv().Settings.SelectedStat, 1) end)
+        end
+    end)
+end})
+
+-- Fly + phím E tắt
+Main:CreateSection("Misc"):CreateToggle({Name="Fly (E = Tắt)",CurrentValue=false,Callback=function(v)
+    getgenv().Fly = v
     if v then
+        local bv = Instance.new("BodyVelocity",player.Character.HumanoidRootPart)
+        bv.Name = "VipyFly"
+        bv.MaxForce = Vector3.new(1e5,1e5,1e5)
         spawn(function()
-            while v and task.wait(0.5) do
-                pcall(function() CommF_:InvokeServer("AddPoint", getgenv().Config.AutoStats, 1) end)
+            while getgenv().Fly do task.wait()
+                bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * getgenv().Settings.FlySpeed
             end
+            bv:Destroy()
         end)
     end
 end})
+UserInputService.InputBegan:Connect(function(i) if i.KeyCode == Enum.KeyCode.E and getgenv().Fly then getgenv().Fly = false end end)
 
-local TpSec = MainTab:CreateSection("Teleport")
-local TpList = {
-    ["Sea 1"]=Vector3.new(1071,15,-1380),["Sea 2"]=Vector3.new(-3850,73,-1005),["Sea 3"]=Vector3.new(5742,623,-190),
-    ["Green Zone"]=Vector3.new(-2440,73,-2160),["Fountain City"]=Vector3.new(5127,5,4012),
-    ["Mansion"]=Vector3.new(-1250,350,5200),["Port Town"]=Vector3.new(-290,80,5450),["Hydra Island"]=Vector3.new(5742,623,-190)
-}
-MainTab:CreateDropdown({Name="Chọn Địa Điểm",Options={"Sea 1","Sea 2","Sea 3","Green Zone","Fountain City","Mansion","Port Town","Hydra Island"},CurrentOption="Sea 1",
-Callback=function(o)
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and TpList[o] then
-        TweenService:Create(player.Character.HumanoidRootPart,TweenInfo.new(2),{CFrame=CFrame.new(TpList[o])}):Play()
-    end
-end})
+Main:CreateSection("Misc"):CreateSlider({Name="Fly Speed",Range={50,500},Increment=10,CurrentValue=200,Callback=function(v) getgenv().Settings.FlySpeed=v end})
+Main:CreateSection("Misc"):CreateToggle({Name="NoClip",CurrentValue=false,Callback=function(v) getgenv().NoClip=v end})
 
-local MiscSec = MainTab:CreateSection("Misc")
-MainTab:CreateToggle({Name="Fly",CurrentValue=false,Callback=function(v) getgenv().FlyEnabled=v end})
-MainTab:CreateSlider({Name="Fly Speed",Range={50,500},Increment=10,CurrentValue=200,Callback=function(v) getgenv().Config.FlySpeed=v end})
-MainTab:CreateToggle({Name="NoClip",CurrentValue=false,Callback=function(v) getgenv().NoClip=v end})
-MainTab:CreateToggle({Name="Infinite Jump",CurrentValue=false,Callback=function(v)
-    if v then UserInputService.JumpRequest:Connect(function() if v then player.Character.Humanoid:ChangeState("Jumping") end end) end
-end})
-
+-- NoClip + Anti-AFK
 spawn(function()
-    while task.wait() do
+    while task.wait(1) do
         pcall(function()
-            if getgenv().NoClip and player.Character then
-                for _,p in pairs(player.Character:GetDescendants()) do
-                    if p:IsA("BasePart") then p.CanCollide=false end
+            if getgenv().NoClip then
+                for _,p in player.Character:GetDescendants() do
+                    if p:IsA("BasePart") then p.CanCollide = false end
                 end
             end
-            if getgenv().FlyEnabled and player.Character then
-                local hrp = player.Character.HumanoidRootPart
-                local bv = hrp:FindFirstChild("VipyFly") or Instance.new("BodyVelocity",hrp)
-                bv.Name="VipyFly"
-                bv.MaxForce=Vector3.new(1e5,1e5,1e5)
-                bv.Velocity=(workspace.CurrentCamera.CFrame.LookVector*getgenv().Config.FlySpeed)+Vector3.new(0,20,0)
-                if not getgenv().FlyEnabled then bv:Destroy() end
-            end
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
         end)
     end
 end)
 
-Rayfield:Notify({
-    Title="Vipy Hub Ready!",
-    Content="Nhấn Insert để ẩn/hiện • Chúc farm zui nha!",
-    Duration=7,
-    Image=AvatarURL
-})
+Rayfield:Notify({Title="Vipy Hub Ready!",Content="Farm thoải mái • Acc phụ nha!",Duration=8,Image=AvatarURL})
